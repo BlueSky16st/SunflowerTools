@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="author" content="Hsin" />
+    <title>STATUS INDICATOR</title>
+
+    <style>
+        * {
+            font-size: 12px;
+            cursor: default;
+        }
+
+        .resizeHandle {
+            background-image: url(images/handle.png);
+            background-position: bottom right;
+            background-repeat: no-repeat;
+            box-sizing: border-box;
+        }
+
+        body,
+        html {
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        html {
+            height: 100%;
+            overflow: hidden;
+            background-color: transparent;
+        }
+
+        .app {
+            color: white;
+        }
+
+        .app .tip {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            font-weight: bold;
+            color: rgb(187, 62, 45);
+            background-color: #c5c0c099;
+        }
+
+        .app .tip div {
+            font-size: 18px;
+        }
+
+        .app .combat .skills {
+            display: flex;
+        }
+
+        .app .combat .skills .skills-item {
+            position: relative;
+            width: 60px;
+            height: 60px;
+        }
+
+        .app .combat .skills .skills-item:hover {
+            opacity: .9;
+        }
+
+        .app .combat .skills .skills-item .item-skill {
+            width: 100%;
+            height: 100%;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .app .combat .skills .skills-item .item-skill .item-img {
+            width: 84%;
+            height: 84%;
+            position: absolute;
+            top: 2.3px;
+            left: 5px;
+        }
+
+        .app .combat .skills .skills-item .item-skill .item-cover {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .app .combat .skills .skills-item .item-countdown {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            font-size: 25px;
+            line-height: 55px;
+            text-align: center;
+            color: #efefef;
+            z-index: 2;
+        }
+
+        .app .combat .skills .skills-item .item-mask {
+            position: absolute;
+            left: 5px;
+            top: 1.3px;
+            width: 84%;
+            height: 86%;
+            background-color: black;
+            opacity: .7;
+            z-index: 1;
+            border-radius: 5px;
+        }
+
+        .app .fishing {
+            width: 100%;
+            height: 100%;
+        }
+
+        .app .fishing .countdown {
+            width: 100%;
+            background-color: #00000099;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 22px;
+            padding: 6px 0;
+        }
+
+        .app .fishing .tip {
+            width: 100%;
+            background-color: #00000099;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 50px;
+            padding: 6px 0;
+        }
+    </style>
+
+    <script src="https://act.diemoe.net/overlays/common/common.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+
+</head>
+
+<body>
+    <div id="app" class="app">
+        <div class="tip" v-show="!isWindowLocked">
+            <div>拖动本窗口来调整位置</div>
+            <div>按住窗口右下角图标可调整窗口大小</div>
+            <br>
+            <div>勾选"鼠标穿透"和"锁定悬浮窗"</div>
+            <div>来隐藏此提示</div>
+        </div>
+        <div class="combat" v-show="isCombat">
+            <div class="skills" v-for="skill in skillRow">
+                <div class="skills-item" v-for="item in skill">
+                    <div class="item-skill">
+                        <img class="item-img" :src="item.skillImage">
+                        <img class="item-cover" src="images/icons/cover.png">
+                    </div>
+                    <span class="item-countdown" v-show="item.countdown > 0">{{item.countdown}}</span>
+                    <div class="item-mask" v-show="item.countdown > 0"></div>
+                </div>
+            </div>
+        </div>
+        <div class="fishing" v-show="isFishing">
+            <div class="countdown" style="display: none;">{{fishing.countdown * 10 % 10 == 0 ? fishing.countdown + '.0'
+                :
+                fishing.countdown}}{{fishing.countdown > 0 ? 's' : ''}}</div>
+            <div class="tip" v-show="isMooch">以小钓大中...</div>
+        </div>
+    </div>
+
+    <script>
+        var app = new Vue({
+            el: '#app',
+            data: {
+                // 窗口已锁定
+                isWindowLocked: false,
+
+                // 如果在战斗, 则显示状态指示器
+                isCombat: false,
+                // 战斗指示器倒计时ID
+                combatCountdownId: 0,
+                // 技能栏
+                skillRow: {
+
+                    // 抽卡类
+                    drawSkills: {
+                        // 占星 抽卡
+                        draw: {
+                            countdown: 0,
+                            defaultCountdown: 30,
+                            skillImage: 'images/icons/skills/06_AST/draw.png',
+                            intervalId: 0
+                        },
+                        // 占星 袖内抽卡
+                        sleeveDraw: {
+                            countdown: 0,
+                            defaultCountdown: 180,
+                            skillImage: 'images/icons/skills/06_AST/sleeve_draw.png',
+                            intervalId: 0
+                        },
+                        // 占星 占卜
+                        divination: {
+                            countdown: 0,
+                            defaultCountdown: 120,
+                            skillImage: 'images/icons/skills/06_AST/divination.png',
+                            intervalId: 0
+                        },
+                    },
+
+                    // 状态类
+                    hotSkills: {
+                        // 占星 焚灼
+                        combust: {
+                            countdown: 0,
+                            defaultCountdown: 30,
+                            skillImage: 'images/icons/skills/06_AST/combust.png',
+                            intervalId: 0
+                        },
+                        // 通用 即刻咏唱
+                        swiftcast: {
+                            countdown: 0,
+                            defaultCountdown: 60,
+                            skillImage: 'images/icons/skills/06_AST/swiftcast.png',
+                            intervalId: 0
+                        },
+                        // 占星 光速
+                        lightspeed: {
+                            countdown: 0,
+                            defaultCountdown: 90,
+                            skillImage: 'images/icons/skills/06_AST/lightspeed.png',
+                            intervalId: 0
+                        },
+                        // 通用 醒梦
+                        lucidDreaming: {
+                            countdown: 0,
+                            defaultCountdown: 60,
+                            skillImage: 'images/icons/skills/06_AST/lucid_dreaming.png',
+                            intervalId: 0
+                        }
+                    },
+
+                    // 治疗类
+                    healSkills: {
+                        // 占星 天星交错
+                        celestialIntersection: {
+                            countdown: 0,
+                            defaultCountdown: 30,
+                            skillImage: 'images/icons/skills/06_AST/celestial_intersection.png',
+                            intervalId: 0
+                        },
+                        // 占星 天星冲日
+                        celestialOpposition: {
+                            countdown: 0,
+                            defaultCountdown: 60,
+                            skillImage: 'images/icons/skills/06_AST/celestial_opposition.png',
+                            intervalId: 0
+                        },
+                        // 占星 地星
+                        earthlyStar: {
+                            countdown: 0,
+                            defaultCountdown: 60,
+                            skillImage: 'images/icons/skills/06_AST/earthly_star.png',
+                            intervalId: 0
+                        },
+                        // 占星 命运之轮
+                        collectiveUnconscious: {
+                            countdown: 0,
+                            defaultCountdown: 60,
+                            skillImage: 'images/icons/skills/06_AST/collective_unconscious.png',
+                            intervalId: 0
+                        },
+                        // 占星 天宫图
+                        horoscope: {
+                            countdown: 0,
+                            defaultCountdown: 60,
+                            skillImage: 'images/icons/skills/06_AST/horoscope.png',
+                            intervalId: 0
+                        },
+                    },
+
+                },
+
+
+
+                // 钓鱼
+                isFishing: false,
+                // 是否正在以小钓大
+                isMooch: false,
+                fishing: {
+                    countdown: 0.0,
+                    fishingCountdownId: 0
+                }
+
+            },
+            created() {
+                let that = this;
+
+                document.addEventListener("onOverlayStateUpdate", function (e) {
+                    that.isWindowLocked = e.detail.isLocked;
+                    if (!e.detail.isLocked) {
+                        that.displayResizeHandle();
+                    } else {
+                        that.hideResizeHandle();
+                    }
+                });
+
+                addOverlayListener('CombatData', (data) => that.onCombatData(data));
+                addOverlayListener('ChangeZone', (data) => that.onChangeZone(data));
+                addOverlayListener('LogLine', (data) => that.onLogData(data));
+                startOverlayEvents();
+            },
+            methods: {
+                displayResizeHandle() {
+                    document.documentElement.classList.add("resizeHandle");
+                },
+                hideResizeHandle() {
+                    document.documentElement.classList.remove("resizeHandle");
+                },
+                onCombatData(data) {
+                    let that = this;
+
+                    if (this.isNull(data) || this.isNull(data.Combatant) || this.isNull(data.Combatant.YOU) || this.isNull(data.Combatant.YOU.Job))
+                        return;
+
+                    // 对于战场的场景, 不需要启用状态指示器
+                    if (data.Encounter.CurrentZoneName === '狼狱停船场')
+                        return;
+
+                    // 当前战斗的职业是占星时, 启用占星状态指示器
+                    if (data.Combatant.YOU.Job === 'Ast') {
+                        this.isCombat = true;
+
+                        clearTimeout(this.combatCountdownId);
+                        // 20秒后还没有新的战斗数据, 说明已经脱离战斗, 隐藏状态指示器
+                        this.combatCountdownId = setTimeout(() => {
+                            that.isCombat = false;
+                            clearTimeout(that.combatCountdownId);
+                        }, 20 * 1000);
+                    }
+                },
+                onChangeZone(data) {
+                    this.isCombat = false;
+                    clearTimeout(this.combatCountdownId);
+                },
+                onLogData(data) {
+                    let isDone = false;
+
+                    // 钓鱼类
+                    let action = data.line[4];
+                    isDone = this.fishProc(action);
+
+                    if (isDone)
+                        return;
+
+                    // 战斗类
+                    let skill = data.line[5];
+                    let playerName = data.line[3];
+                    isDone = this.combatProc(playerName, skill);
+
+                    if (isDone)
+                        return;
+
+                },
+                startSkillCountdown(skill) {
+                    skill.countdown = skill.defaultCountdown;
+                    clearInterval(skill.intervalId);
+                    skill.intervalId = setInterval(() => {
+                        skill.countdown--;
+                        if (skill.countdown <= 0)
+                            clearInterval(skill.intervalId);
+                    }, 999);
+                },
+                startFishingCountdown() {
+                    let that = this;
+                    this.isFishing = true;
+                    this.stopFishingCountdown();
+                    this.fishing.fishingCountdownId = setInterval(() => {
+                        that.fishing.countdown = Number((that.fishing.countdown + 0.1).toFixed(1));
+                        if (that.fishing.countdown > 200) {
+                            that.stopFishingCountdown();
+                            that.isFishing = false;
+                            that.isMooch = false;
+                        }
+                    }, 100);
+                },
+                stopFishingCountdown() {
+                    let that = this;
+                    clearInterval(this.fishing.fishingCountdownId);
+                    this.fishing.countdown = 0.0;
+                },
+                isNull(obj) {
+                    return obj === undefined || obj === null;
+                },
+                fishProc(action) {
+                    if (action.indexOf('甩出了鱼线开始钓鱼。') >= 0 || action.indexOf('尝试以小钓大。') >= 0) {
+                        this.isMooch = action.indexOf('尝试以小钓大。') >= 0;
+
+                        this.startFishingCountdown();
+                        return true;
+                    } else if (action.indexOf('没有钓到任何东西') >= 0 || action.indexOf('有鱼上钩了') >= 0 || action.indexOf('不经意间鱼饵被吃掉了') >= 0) {
+                        this.isFishing = false;
+                        this.isMooch = false;
+
+                        this.stopFishingCountdown();
+                        return true;
+                    }
+
+                    return false;
+                },
+                combatProc(playerName, skillName) {
+                    let isDone = false;
+
+                    // 仅处理指定角色名(不过要重新检查一下这个...一般不需要这样取得是否是自己的值才对)
+                    if (playerName !== '叶叶空')
+                        return isDone;
+
+                    switch (skillName) {
+
+                        case '抽卡':
+                            this.startSkillCountdown(this.skillRow.drawSkills.draw);
+                            isDone = true;
+                            break;
+                        case '袖内抽卡':
+                            this.startSkillCountdown(this.skillRow.drawSkills.sleeveDraw);
+                            isDone = true;
+                            break;
+                        case '占卜':
+                            this.startSkillCountdown(this.skillRow.drawSkills.divination);
+                            isDone = true;
+                            break;
+
+                        case '焚灼':
+                            this.startSkillCountdown(this.skillRow.hotSkills.combust);
+                            isDone = true;
+                            break;
+                        case '即刻咏唱':
+                            this.startSkillCountdown(this.skillRow.hotSkills.swiftcast);
+                            isDone = true;
+                            break;
+                        case '光速':
+                            this.startSkillCountdown(this.skillRow.hotSkills.lightspeed);
+                            isDone = true;
+                            break;
+                        case '醒梦':
+                            this.startSkillCountdown(this.skillRow.hotSkills.lucidDreaming);
+                            isDone = true;
+                            break;
+
+                        case '天星交错':
+                            this.startSkillCountdown(this.skillRow.healSkills.celestialIntersection);
+                            isDone = true;
+                            break;
+                        case '天星冲日':
+                            this.startSkillCountdown(this.skillRow.healSkills.celestialOpposition);
+                            isDone = true;
+                            break;
+                        case '地星':
+                            this.startSkillCountdown(this.skillRow.healSkills.earthlyStar);
+                            isDone = true;
+                            break;
+                        case '命运之轮':
+                            this.startSkillCountdown(this.skillRow.healSkills.collectiveUnconscious);
+                            isDone = true;
+                            break;
+                        case '天宫图':
+                            this.startSkillCountdown(this.skillRow.healSkills.horoscope);
+                            isDone = true;
+                            break;
+
+                        default:
+                            break;
+                    }
+
+                    return isDone;
+
+                }
+            }
+        });
+
+    </script>
+</body>
+
+</html>

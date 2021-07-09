@@ -1,0 +1,11 @@
+.vs
+App_Data
+uploadfiles
+bin
+obj
+.vs
+.vscode
+logs
+dump.rdb
+Build
+Publish
