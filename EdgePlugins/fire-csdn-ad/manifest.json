@@ -1,0 +1,13 @@
+{
+  "manifest_version": 2,
+  "name": "关闭CSDN大屏广告",
+  "version": "0.0.1",
+  "description": "总是弹那么大块的广告, 我要把你快速关闭!",
+  "content_scripts": [
+    {
+      "matches": ["https://blog.csdn.net/*"],
+      "js": ["js/fire.js"],
+      "run_at": "document_start"
+    }
+  ]
+}
