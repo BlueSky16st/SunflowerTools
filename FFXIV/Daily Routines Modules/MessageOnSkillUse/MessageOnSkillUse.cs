@@ -25,12 +25,14 @@ public class MessageOnSkillUse : DailyModuleBase
 
     private const string Uri = "https://dr-cache.sumemo.dev";
 
-    public Dictionary<uint, HealAction> TargetActions = [];
+    private Dictionary<uint, ActionInfo> TargetActions = [];
 
     private static ModuleStorage ModuleConfig = null!;
 
-    // ui
-    private static ActionSelectCombo? ActionSelect;
+    private static string GetStr(string msg, string? id = null)
+    {
+        return GetLoc(msg) + (id != null ? $"##Moku-{id}" : "");
+    }
 
     #region Init
 
@@ -39,7 +41,7 @@ public class MessageOnSkillUse : DailyModuleBase
         ModuleConfig = LoadConfig<ModuleStorage>() ?? new ModuleStorage();
 
         // 初始化配置名称列表
-        configNames = ModuleConfig.ConfigNames ?? new List<string>();
+        configNames = ModuleConfig.ConfigNames ?? [];
 
         FetchActions().Wait();
 
@@ -57,15 +59,22 @@ public class MessageOnSkillUse : DailyModuleBase
 
     #region UI
 
+    private static ActionSelectCombo? ActionSelect;
+    private int selectedConfigIndex = -1;
+    private string newConfigName = "";
+    private bool showAddDialog = false;
+    private List<string> configNames = [];
+    private string newMessageInput = "";
+
     protected override void ConfigUI()
     {
-        if (ImGui.RadioButton(GetLoc("Disable"), !ModuleConfig.IsEnabled))
+        if (ImGui.RadioButton(GetStr("Disable"), !ModuleConfig.IsEnabled))
         {
             ModuleConfig.IsEnabled = false;
             SaveConfig(ModuleConfig);
         }
 
-        if (ImGui.RadioButton(GetLoc("Enable"), ModuleConfig.IsEnabled))
+        if (ImGui.RadioButton(GetStr("Enable"), ModuleConfig.IsEnabled))
         {
             ModuleConfig.IsEnabled = true;
             SaveConfig(ModuleConfig);
@@ -77,6 +86,36 @@ public class MessageOnSkillUse : DailyModuleBase
 
     private void ConfigureActionUI()
     {
+        // 消息概率
+        ImGui.Text(GetStr("发送消息概率") + ":");
+        var moduleConfigMessageProbability = ModuleConfig.MessageProbability;
+        if (ImGui.SliderInt("##MessageProbability", ref moduleConfigMessageProbability, 0, 100))
+        {
+            ModuleConfig.MessageProbability = moduleConfigMessageProbability;
+            SaveConfig(ModuleConfig);
+        }
+
+        ImGui.Separator();
+
+        // 发送频道
+        ImGui.Text(GetStr("发送频道") + ":");
+        var chatType = ModuleConfig.ChatTypeConfig;
+        if (ImGui.BeginCombo("##ChatType", GetChatTypePreview(chatType)))
+        {
+            if (ImGui.Selectable(GetStr("Say"), chatType == ChatType.Say))
+                ModuleConfig.ChatTypeConfig = ChatType.Say;
+
+            if (ImGui.Selectable(GetStr("Party"), chatType == ChatType.Party))
+                ModuleConfig.ChatTypeConfig = ChatType.Party;
+
+            if (ImGui.Selectable(GetStr("Echo"), chatType == ChatType.Echo))
+                ModuleConfig.ChatTypeConfig = ChatType.Echo;
+
+            ImGui.EndCombo();
+        }
+
+        ImGui.Separator();
+
         // 创建两列布局
         ImGui.Columns(2, "SkillConfig", true);
 
@@ -91,18 +130,12 @@ public class MessageOnSkillUse : DailyModuleBase
         ImGui.Columns(1); // 重置为单列
     }
 
-    private int selectedConfigIndex = -1;
-    private string newConfigName = "";
-    private bool showAddDialog = false;
-    private List<string> configNames = [];
-    private string newMessageInput = "";
-
     private void ConfigureLeftColumn()
     {
-        ImGui.TextColored(LightSkyBlue, "配置列表");
+        ImGui.TextColored(LightSkyBlue, GetStr("配置列表"));
 
         // 添加按钮
-        if (ImGui.Button("添加##AddConfig"))
+        if (ImGui.Button(GetStr("Add", "AddConfig")))
         {
             showAddDialog = true;
             newConfigName = "";
@@ -112,14 +145,14 @@ public class MessageOnSkillUse : DailyModuleBase
         if (showAddDialog)
         {
             ImGui.SetNextWindowSize(new Vector2(300, 120));
-            if (ImGui.Begin("添加配置##AddConfigDialog", ref showAddDialog))
+            if (ImGui.Begin(GetStr("添加配置", "AddConfigDialog"), ref showAddDialog))
             {
-                ImGui.Text("配置名称:");
+                ImGui.Text(GetStr("配置名称") + ":");
                 ImGui.InputText("##NewConfigName", ref newConfigName, 256);
 
                 ImGui.Separator();
 
-                if (ImGui.Button("确认##ConfirmAdd"))
+                if (ImGui.Button(GetStr("确认", "ConfirmAdd")))
                 {
                     if (!string.IsNullOrWhiteSpace(newConfigName) && !configNames.Contains(newConfigName))
                     {
@@ -135,7 +168,7 @@ public class MessageOnSkillUse : DailyModuleBase
 
                 ImGui.SameLine();
 
-                if (ImGui.Button("取消##CancelAdd"))
+                if (ImGui.Button(GetStr("取消", "CancelAdd")))
                 {
                     showAddDialog = false;
                     newConfigName = "";
@@ -148,18 +181,18 @@ public class MessageOnSkillUse : DailyModuleBase
         ImGui.Separator();
 
         // 配置名称列表
-        for (int i = 0; i < configNames.Count; i++)
+        for (var i = 0; i < configNames.Count; i++)
         {
             var configName = configNames[i];
 
             // 可选择的列表项
-            if (ImGui.Selectable($"{configName}##Config{i}", selectedConfigIndex == i))
+            if (ImGui.Selectable(GetStr(configName, $"Config{i}"), selectedConfigIndex == i))
                 selectedConfigIndex = i;
 
             // 右键菜单
             if (ImGui.BeginPopupContextItem($"ConfigContext{i}"))
             {
-                if (ImGui.MenuItem("删除##DeleteConfig"))
+                if (ImGui.MenuItem(GetStr("删除", "DeleteConfig")))
                 {
                     configNames.RemoveAt(i);
 
@@ -180,12 +213,12 @@ public class MessageOnSkillUse : DailyModuleBase
 
     private void ConfigureRightColumn()
     {
-        ImGui.TextColored(LightSkyBlue, "技能配置");
+        ImGui.TextColored(LightSkyBlue, GetStr("技能配置"));
 
         if (selectedConfigIndex >= 0 && selectedConfigIndex < configNames.Count)
         {
             var selectedConfigName = configNames[selectedConfigIndex];
-            ImGui.Text($"当前配置: {selectedConfigName}");
+            ImGui.Text(GetStr("当前配置") + $": {selectedConfigName}");
             ImGui.Separator();
 
             // 确保配置数据存在
@@ -194,9 +227,18 @@ public class MessageOnSkillUse : DailyModuleBase
 
             var configData = ModuleConfig.Configurations[selectedConfigName];
 
+            // 启用
+            var isEnabled = configData.IsEnabled;
+            if (ImGui.Checkbox(GetStr("启用", $"Enabled{selectedConfigIndex}"), ref isEnabled))
+            {
+                configData.IsEnabled = isEnabled;
+                SaveConfig(ModuleConfig);
+            }
+
             // 技能选择下拉多选框
-            ImGui.Text("选择技能:");
-            if (ActionSelect != null && ActionSelect.DrawCheckbox())
+            ImGui.Text(GetStr("选择技能") + ":");
+            ActionSelect.SelectedActionIDs = configData.SelectedActionIDs.ToHashSet();
+            if (ActionSelect.DrawCheckbox())
             {
                 configData.SelectedActionIDs = ActionSelect.SelectedActionIDs.ToList();
                 SaveConfig(ModuleConfig);
@@ -205,10 +247,10 @@ public class MessageOnSkillUse : DailyModuleBase
             ImGui.Separator();
 
             // 消息配置
-            ImGui.Text("消息列表:");
+            ImGui.Text(GetStr("消息列表") + ":");
 
             // 显示现有消息
-            for (int i = 0; i < configData.Messages.Count; i++)
+            for (var i = 0; i < configData.Messages.Count; i++)
             {
                 ImGui.PushID($"Message{i}");
 
@@ -223,7 +265,7 @@ public class MessageOnSkillUse : DailyModuleBase
                 ImGui.SameLine();
 
                 // 删除按钮
-                if (ImGui.Button($"删除##DeleteMessage{i}"))
+                if (ImGui.Button(GetStr("删除", $"DeleteMessage{i}")))
                 {
                     configData.Messages.RemoveAt(i);
                     SaveConfig(ModuleConfig);
@@ -235,31 +277,28 @@ public class MessageOnSkillUse : DailyModuleBase
 
             // 新消息输入
             ImGui.Separator();
-            ImGui.Text("添加新消息:");
+            ImGui.Text(GetStr("添加新消息") + ":");
 
-            if (ImGui.InputText("##NewMessage", ref newMessageInput, 512))
+            if (ImGui.InputText("##NewMessage", ref newMessageInput, 128))
             {
                 // 输入时不需要特殊处理
             }
 
             ImGui.SameLine();
 
-            if (ImGui.Button("添加##AddMessage"))
+            if (ImGui.Button(GetStr("Add", "##AddMessage")))
             {
                 if (!string.IsNullOrWhiteSpace(newMessageInput))
                 {
                     configData.Messages.Add(newMessageInput);
-                    newMessageInput = ""; // 清空输入框
+                    // 清空输入框
+                    newMessageInput = "";
                     SaveConfig(ModuleConfig);
                 }
             }
-
-            // 显示消息统计
-            ImGui.Separator();
-            ImGui.Text($"消息数量: {configData.Messages.Count}");
         }
         else
-            ImGui.TextWrapped("请从左侧选择一个配置进行编辑");
+            ImGui.TextWrapped(GetStr("请从左侧选择一个配置进行编辑"));
     }
 
     #endregion
@@ -288,7 +327,7 @@ public class MessageOnSkillUse : DailyModuleBase
 
         foreach (var config in ModuleConfig.Configurations.Values)
         {
-            if (config.SelectedActionIDs.Contains(actionId) && config.Messages.Count > 0)
+            if (config.IsEnabled && config.SelectedActionIDs.Contains(actionId) && config.Messages.Count > 0)
                 matchingMessages.AddRange(config.Messages);
         }
 
@@ -299,7 +338,7 @@ public class MessageOnSkillUse : DailyModuleBase
         var selectedMessage = matchingMessages[random.Next(matchingMessages.Count)];
 
         // 发送消息
-        SendChatMessage(selectedMessage);
+        SendChatMessage(selectedMessage, ModuleConfig.ChatTypeConfig);
     }
 
     private static void PostUseActionLocationDelegate(
@@ -342,7 +381,7 @@ public class MessageOnSkillUse : DailyModuleBase
         try
         {
             var json = await HttpClientHelper.Get().GetStringAsync($"{Uri}/heal-action");
-            var resp = JsonConvert.DeserializeObject<Dictionary<string, List<HealAction>>>(json);
+            var resp = JsonConvert.DeserializeObject<Dictionary<string, List<ActionInfo>>>(json);
             if (resp == null)
                 Error($"[HealerHelper] 远程治疗技能文件解析失败: {json}");
             else
@@ -357,6 +396,22 @@ public class MessageOnSkillUse : DailyModuleBase
     }
 
     #endregion
+
+    /// <summary>
+    /// 获取聊天类型的预览文本
+    /// </summary>
+    /// <param name="chatType"></param>
+    /// <returns></returns>
+    private static string GetChatTypePreview(string chatType)
+    {
+        return chatType switch
+        {
+            ChatType.Say => GetStr("Say"),
+            ChatType.Party => GetStr("Party"),
+            ChatType.Echo => GetStr("Echo"),
+            _ => GetStr("Unknown")
+        };
+    }
 
     /// <summary>
     /// 发送聊天消息
@@ -381,21 +436,27 @@ public class MessageOnSkillUse : DailyModuleBase
 
     private class ModuleStorage : ModuleConfiguration
     {
-        // 配置名称列表
-        public List<string> ConfigNames { get; set; } = [];
-
-        // 配置名称 -> 配置数据的映射
-        public Dictionary<string, ConfigData> Configurations { get; set; } = new();
-
         // 是否启用功能
         public bool IsEnabled { get; set; } = true;
 
         // 消息发送概率（0-100）
         public int MessageProbability { get; set; } = 100;
+
+        /// <summary>
+        /// 发送频道
+        /// </summary>
+        public string ChatTypeConfig { get; set; } = ChatType.Echo;
+
+        // 配置名称列表
+        public List<string> ConfigNames { get; set; } = [];
+
+        // 配置名称 -> 配置数据的映射
+        public Dictionary<string, ConfigData> Configurations { get; set; } = new();
     }
 
-    public class ConfigData
+    private class ConfigData
     {
+        public bool IsEnabled { get; set; } = true;
         public List<uint> SelectedActionIDs { get; set; } = [];
         public List<string> Messages { get; set; } = [];
     }
@@ -403,7 +464,7 @@ public class MessageOnSkillUse : DailyModuleBase
     #endregion
 }
 
-public class HealAction
+public class ActionInfo
 {
     [JsonProperty("id")]
     public uint Id { get; private set; }
