@@ -80,20 +80,6 @@ public class MessageOnSkillUse : DailyModuleBase
         ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8, 6));
         ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.85f, 0.95f, 0.95f, 1.0f));
 
-        // 消息概率
-        // ImGui.TextColored(new Vector4(0.7f, 0.9f, 0.7f, 1.0f), GetStr("发送消息概率") + ":");
-        // ImGui.SameLine();
-        // ImGui.TextDisabled("(0-100, 概率越高越频繁)");
-        // var moduleConfigMessageProbability = ModuleConfig.MessageProbability;
-        // if (ImGui.SliderInt("##MessageProbability", ref moduleConfigMessageProbability, 0, 100))
-        // {
-        //     ModuleConfig.MessageProbability = moduleConfigMessageProbability;
-        //     SaveConfig(ModuleConfig);
-        // }
-        //
-        // ImGui.Separator();
-        // ImGui.Spacing();
-
         // 发送频道
         ImGui.TextColored(new Vector4(0.7f, 0.8f, 1.0f, 1.0f), GetStr("发送频道") + ":");
         ImGui.SameLine();
@@ -130,7 +116,8 @@ public class MessageOnSkillUse : DailyModuleBase
         // 右列 - 详细配置
         ConfigureRightColumn();
 
-        ImGui.Columns(1); // 重置为单列
+        // 重置为单列
+        ImGui.Columns(1);
     }
 
     private void ConfigureLeftColumn()
@@ -497,7 +484,7 @@ public class MessageOnSkillUse : DailyModuleBase
             var json = await HttpClientHelper.Get().GetStringAsync($"{Uri}/heal-action");
             var resp = JsonConvert.DeserializeObject<Dictionary<string, List<ActionInfo>>>(json);
             if (resp == null)
-                Error($"[MessageOnSkillUse] 远程治疗技能文件解析失败: {json}");
+                Error($"[MessageOnSkillUse] 技能文件解析失败: {json}");
             else
                 TargetActions = resp.SelectMany(kv => kv.Value).Where(p => p.On).ToDictionary(act => act.Id, act => act);
 
@@ -505,7 +492,7 @@ public class MessageOnSkillUse : DailyModuleBase
         }
         catch (Exception ex)
         {
-            Error($"[HealerMessageOnSkillUse] 远程治疗技能文件获取失败: {ex}");
+            Error($"[MessageOnSkillUse] 技能文件获取失败: {ex}");
         }
     }
 
