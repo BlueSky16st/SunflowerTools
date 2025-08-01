@@ -65,40 +65,39 @@ public class MessageOnSkillUse : DailyModuleBase
     private bool showAddDialog = false;
     private List<string> configNames = [];
     private string newMessageInput = "";
+    private bool showRenameDialog = false;
+    private int renameConfigIndex = -1;
+    private string renameConfigName = "";
 
     protected override void ConfigUI()
     {
-        if (ImGui.RadioButton(GetStr("Disable"), !ModuleConfig.IsEnabled))
-        {
-            ModuleConfig.IsEnabled = false;
-            SaveConfig(ModuleConfig);
-        }
-
-        if (ImGui.RadioButton(GetStr("Enable"), ModuleConfig.IsEnabled))
-        {
-            ModuleConfig.IsEnabled = true;
-            SaveConfig(ModuleConfig);
-        }
-
-        if (ModuleConfig.IsEnabled)
-            ConfigureActionUI();
+        ConfigureActionUI();
     }
 
     private void ConfigureActionUI()
     {
-        // 消息概率
-        ImGui.Text(GetStr("发送消息概率") + ":");
-        var moduleConfigMessageProbability = ModuleConfig.MessageProbability;
-        if (ImGui.SliderInt("##MessageProbability", ref moduleConfigMessageProbability, 0, 100))
-        {
-            ModuleConfig.MessageProbability = moduleConfigMessageProbability;
-            SaveConfig(ModuleConfig);
-        }
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(6, 4));
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8, 6));
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.85f, 0.95f, 0.95f, 1.0f));
 
-        ImGui.Separator();
+        // 消息概率
+        // ImGui.TextColored(new Vector4(0.7f, 0.9f, 0.7f, 1.0f), GetStr("发送消息概率") + ":");
+        // ImGui.SameLine();
+        // ImGui.TextDisabled("(0-100, 概率越高越频繁)");
+        // var moduleConfigMessageProbability = ModuleConfig.MessageProbability;
+        // if (ImGui.SliderInt("##MessageProbability", ref moduleConfigMessageProbability, 0, 100))
+        // {
+        //     ModuleConfig.MessageProbability = moduleConfigMessageProbability;
+        //     SaveConfig(ModuleConfig);
+        // }
+        //
+        // ImGui.Separator();
+        // ImGui.Spacing();
 
         // 发送频道
-        ImGui.Text(GetStr("发送频道") + ":");
+        ImGui.TextColored(new Vector4(0.7f, 0.8f, 1.0f, 1.0f), GetStr("发送频道") + ":");
+        ImGui.SameLine();
+        ImGui.TextDisabled("(选择消息发送的频道)");
         var chatType = ModuleConfig.ChatTypeConfig;
         if (ImGui.BeginCombo("##ChatType", GetChatTypePreview(chatType)))
         {
@@ -114,7 +113,11 @@ public class MessageOnSkillUse : DailyModuleBase
             ImGui.EndCombo();
         }
 
+        ImGui.PopStyleColor();
+        ImGui.PopStyleVar(2);
+
         ImGui.Separator();
+        ImGui.Spacing();
 
         // 创建两列布局
         ImGui.Columns(2, "SkillConfig", true);
@@ -132,43 +135,51 @@ public class MessageOnSkillUse : DailyModuleBase
 
     private void ConfigureLeftColumn()
     {
-        ImGui.TextColored(LightSkyBlue, GetStr("配置列表"));
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(6, 4));
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8, 6));
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.6f, 0.8f, 1.0f, 1.0f));
+        ImGui.Text(GetStr("配置列表"));
+        ImGui.PopStyleColor();
+        ImGui.Spacing();
 
         // 添加按钮
-        if (ImGui.Button(GetStr("Add", "AddConfig")))
+        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.18f, 0.32f, 0.45f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.22f, 0.38f, 0.55f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.13f, 0.22f, 0.35f, 1.0f));
+        if (ImGui.Button(GetStr("添加配置", "AddConfig"), new Vector2(120, 28)))
         {
             showAddDialog = true;
             newConfigName = "";
         }
 
+        ImGui.PopStyleColor(3);
+        ImGui.Spacing();
+
         // 添加配置对话框
         if (showAddDialog)
         {
-            ImGui.SetNextWindowSize(new Vector2(300, 120));
-            if (ImGui.Begin(GetStr("添加配置", "AddConfigDialog"), ref showAddDialog))
+            ImGui.SetNextWindowSize(new Vector2(320, 140));
+            if (ImGui.Begin(GetStr("新建配置", "AddConfigDialog"), ref showAddDialog, ImGuiWindowFlags.NoResize | ImGuiWindowFlags.AlwaysAutoResize))
             {
                 ImGui.Text(GetStr("配置名称") + ":");
                 ImGui.InputText("##NewConfigName", ref newConfigName, 256);
-
+                ImGui.Spacing();
                 ImGui.Separator();
-
-                if (ImGui.Button(GetStr("确认", "ConfirmAdd")))
+                ImGui.Spacing();
+                if (ImGui.Button(GetStr("确认", "ConfirmAdd"), new Vector2(80, 0)))
                 {
                     if (!string.IsNullOrWhiteSpace(newConfigName) && !configNames.Contains(newConfigName))
                     {
                         configNames.Add(newConfigName);
                         showAddDialog = false;
                         newConfigName = "";
-
-                        // 保存配置名称列表到ModuleConfig
                         ModuleConfig.ConfigNames = configNames;
                         SaveConfig(ModuleConfig);
                     }
                 }
 
                 ImGui.SameLine();
-
-                if (ImGui.Button(GetStr("取消", "CancelAdd")))
+                if (ImGui.Button(GetStr("取消", "CancelAdd"), new Vector2(80, 0)))
                 {
                     showAddDialog = false;
                     newConfigName = "";
@@ -179,47 +190,104 @@ public class MessageOnSkillUse : DailyModuleBase
         }
 
         ImGui.Separator();
+        ImGui.Spacing();
 
         // 配置名称列表
         for (var i = 0; i < configNames.Count; i++)
         {
             var configName = configNames[i];
-
-            // 可选择的列表项
+            ImGui.PushID(i);
+            ImGui.PushStyleColor(ImGuiCol.Header, selectedConfigIndex == i
+                ? new Vector4(0.18f, 0.28f, 0.45f, 0.85f)
+                : new Vector4(0.7f, 0.8f, 0.9f, 0.7f));
+            ImGui.PushStyleColor(ImGuiCol.Text, selectedConfigIndex == i
+                ? new Vector4(0.95f, 0.98f, 1.0f, 1.0f)
+                : new Vector4(0.7f, 0.8f, 0.9f, 1.0f));
+            ImGui.PushStyleColor(ImGuiCol.HeaderHovered, new Vector4(0.22f, 0.32f, 0.55f, 0.7f));
             if (ImGui.Selectable(GetStr(configName, $"Config{i}"), selectedConfigIndex == i))
                 selectedConfigIndex = i;
+            ImGui.PopStyleColor(3);
 
             // 右键菜单
             if (ImGui.BeginPopupContextItem($"ConfigContext{i}"))
             {
+                if (ImGui.MenuItem(GetStr("重命名", "RenameConfig")))
+                {
+                    renameConfigIndex = i;
+                    renameConfigName = configName;
+                    showRenameDialog = true;
+                    ImGui.CloseCurrentPopup();
+                }
+
                 if (ImGui.MenuItem(GetStr("删除", "DeleteConfig")))
                 {
+                    ModuleConfig.Configurations.Remove(configName);
                     configNames.RemoveAt(i);
-
                     if (selectedConfigIndex == i)
                         selectedConfigIndex = -1;
                     else if (selectedConfigIndex > i)
                         selectedConfigIndex--;
-
-                    // 保存到ModuleConfig
                     ModuleConfig.ConfigNames = configNames;
                     SaveConfig(ModuleConfig);
                 }
 
                 ImGui.EndPopup();
             }
+
+            ImGui.PopID();
+            ImGui.Spacing();
+        }
+
+        ImGui.PopStyleVar(2);
+
+        // 重命名配置对话框
+        if (showRenameDialog)
+        {
+            ImGui.SetNextWindowSize(new Vector2(320, 140));
+            if (ImGui.Begin(GetStr("重命名配置", "RenameConfigDialog"), ref showRenameDialog,
+                    ImGuiWindowFlags.NoResize | ImGuiWindowFlags.AlwaysAutoResize))
+            {
+                ImGui.Text(GetStr("新名称") + ":");
+                ImGui.InputText("##RenameConfigName", ref renameConfigName, 256);
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+                if (ImGui.Button(GetStr("确认", "ConfirmRename"), new Vector2(80, 0)))
+                {
+                    if (!string.IsNullOrWhiteSpace(renameConfigName) && !configNames.Contains(renameConfigName))
+                    {
+                        configNames[renameConfigIndex] = renameConfigName;
+                        ModuleConfig.ConfigNames = configNames;
+                        SaveConfig(ModuleConfig);
+                        showRenameDialog = false;
+                    }
+                }
+
+                ImGui.SameLine();
+                if (ImGui.Button(GetStr("取消", "CancelRename"), new Vector2(80, 0)))
+                {
+                    showRenameDialog = false;
+                }
+
+                ImGui.End();
+            }
         }
     }
 
     private void ConfigureRightColumn()
     {
-        ImGui.TextColored(LightSkyBlue, GetStr("技能配置"));
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(6, 4));
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(10, 8));
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.5f, 0.9f, 0.8f, 1.0f));
+        ImGui.Text(GetStr("技能配置"));
+        ImGui.PopStyleColor();
+        ImGui.Spacing();
 
         if (selectedConfigIndex >= 0 && selectedConfigIndex < configNames.Count)
         {
             var selectedConfigName = configNames[selectedConfigIndex];
-            ImGui.Text(GetStr("当前配置") + $": {selectedConfigName}");
-            ImGui.Separator();
+            ImGui.TextColored(new Vector4(0.8f, 0.85f, 1.0f, 1.0f), GetStr("当前配置") + $": {selectedConfigName}");
+            ImGui.Spacing();
 
             // 确保配置数据存在
             if (!ModuleConfig.Configurations.ContainsKey(selectedConfigName))
@@ -228,6 +296,7 @@ public class MessageOnSkillUse : DailyModuleBase
             var configData = ModuleConfig.Configurations[selectedConfigName];
 
             // 启用
+            ImGui.PushStyleColor(ImGuiCol.CheckMark, new Vector4(0.3f, 0.8f, 0.5f, 1.0f));
             var isEnabled = configData.IsEnabled;
             if (ImGui.Checkbox(GetStr("启用", $"Enabled{selectedConfigIndex}"), ref isEnabled))
             {
@@ -235,8 +304,29 @@ public class MessageOnSkillUse : DailyModuleBase
                 SaveConfig(ModuleConfig);
             }
 
+            ImGui.PopStyleColor();
+            ImGui.Spacing();
+
+            ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(6, 4));
+            ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8, 6));
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.85f, 0.95f, 0.95f, 1.0f));
+
+            // 消息概率
+            ImGui.TextColored(new Vector4(0.7f, 0.9f, 0.7f, 1.0f), GetStr("发送消息概率") + ":");
+            ImGui.SameLine();
+            ImGui.TextDisabled("(0-100, 概率越高越频繁)");
+            var moduleConfigMessageProbability = configData.MessageProbability;
+            if (ImGui.SliderInt("##MessageProbability", ref moduleConfigMessageProbability, 0, 100))
+            {
+                configData.MessageProbability = moduleConfigMessageProbability;
+                SaveConfig(ModuleConfig);
+            }
+
+            ImGui.PopStyleColor();
+            ImGui.PopStyleVar(2);
+
             // 技能选择下拉多选框
-            ImGui.Text(GetStr("选择技能") + ":");
+            ImGui.TextColored(new Vector4(0.7f, 0.9f, 0.7f, 1.0f), GetStr("选择技能") + ":");
             ActionSelect.SelectedActionIDs = configData.SelectedActionIDs.ToHashSet();
             if (ActionSelect.DrawCheckbox())
             {
@@ -244,66 +334,80 @@ public class MessageOnSkillUse : DailyModuleBase
                 SaveConfig(ModuleConfig);
             }
 
-            ImGui.Separator();
+            ImGui.Spacing();
 
             // 消息配置
-            ImGui.Text(GetStr("消息列表") + ":");
+            ImGui.TextColored(new Vector4(0.7f, 0.8f, 1.0f, 1.0f), GetStr("消息列表(会随机挑选一条消息发送)") + ":");
+            ImGui.Spacing();
 
             // 显示现有消息
             for (var i = 0; i < configData.Messages.Count; i++)
             {
                 ImGui.PushID($"Message{i}");
-
-                // 消息输入框
                 var message = configData.Messages[i];
-                if (ImGui.InputText($"##MessageInput{i}", ref message, 512))
+                ImGui.PushStyleColor(ImGuiCol.FrameBg, new Vector4(0.15f, 0.18f, 0.22f, 1.0f));
+                ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.25f, 0.28f, 0.35f, 0.7f));
+                if (ImGui.InputTextMultiline($"##MessageInput{i}", ref message, 1024, new Vector2(0, 50)))
                 {
                     configData.Messages[i] = message;
                     SaveConfig(ModuleConfig);
                 }
 
+                ImGui.PopStyleColor(2);
                 ImGui.SameLine();
-
-                // 删除按钮
-                if (ImGui.Button(GetStr("删除", $"DeleteMessage{i}")))
+                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.7f, 0.2f, 0.2f, 1.0f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.8f, 0.3f, 0.3f, 1.0f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.6f, 0.15f, 0.15f, 1.0f));
+                if (ImGui.Button(GetStr("删除", $"DeleteMessage{i}"), new Vector2(60, 0)))
                 {
                     configData.Messages.RemoveAt(i);
                     SaveConfig(ModuleConfig);
-                    i--; // 调整索引
+                    i--;
                 }
 
+                ImGui.PopStyleColor(3);
                 ImGui.PopID();
+                ImGui.Spacing();
             }
 
             // 新消息输入
-            ImGui.Separator();
-            ImGui.Text(GetStr("添加新消息") + ":");
-
-            if (ImGui.InputText("##NewMessage", ref newMessageInput, 128))
+            ImGui.TextColored(new Vector4(0.8f, 0.95f, 0.9f, 1.0f), GetStr("添加新消息") + ":");
+            ImGui.PushStyleColor(ImGuiCol.FrameBg, new Vector4(0.15f, 0.18f, 0.22f, 1.0f));
+            ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.25f, 0.28f, 0.35f, 0.7f));
+            if (ImGui.InputTextMultiline("##NewMessage", ref newMessageInput, 1024, new Vector2(0, 50)))
             {
                 // 输入时不需要特殊处理
             }
 
+            ImGui.PopStyleColor(2);
             ImGui.SameLine();
-
-            if (ImGui.Button(GetStr("Add", "##AddMessage")))
+            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.18f, 0.45f, 0.32f, 1.0f));
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.22f, 0.55f, 0.38f, 1.0f));
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.13f, 0.35f, 0.22f, 1.0f));
+            if (ImGui.Button(GetStr("添加", "AddMessage"), new Vector2(60, 0)))
             {
                 if (!string.IsNullOrWhiteSpace(newMessageInput))
                 {
                     configData.Messages.Add(newMessageInput);
-                    // 清空输入框
                     newMessageInput = "";
                     SaveConfig(ModuleConfig);
                 }
             }
+
+            ImGui.PopStyleColor(3);
         }
         else
-            ImGui.TextWrapped(GetStr("请从左侧选择一个配置进行编辑"));
+            ImGui.TextColored(new Vector4(1.0f, 0.7f, 0.7f, 1.0f), GetStr("请从左侧选择一个配置进行编辑"));
+
+        ImGui.PopStyleVar(2);
     }
 
     #endregion
 
     #region Hooks
+
+    private static DateTime lastMessageTime = DateTime.MinValue;
+    private const int CooldownMs = 2000;
 
     private static void PostUseActionDelegate(
         bool result,
@@ -317,18 +421,25 @@ public class MessageOnSkillUse : DailyModuleBase
         if (actionType != ActionType.Action || !result || !ModuleConfig.IsEnabled)
             return;
 
-        // 检查概率
-        var random = new Random();
-        if (random.Next(1, 101) > ModuleConfig.MessageProbability)
+        // 冷却判断
+        var now = DateTime.Now;
+        if ((now - lastMessageTime).TotalMilliseconds < CooldownMs)
             return;
+
+        var random = new Random();
 
         // 查找包含此技能ID的配置
         var matchingMessages = new List<string>();
-
         foreach (var config in ModuleConfig.Configurations.Values)
         {
             if (config.IsEnabled && config.SelectedActionIDs.Contains(actionId) && config.Messages.Count > 0)
+            {
+                // 检查概率
+                if (random.Next(1, 101) > config.MessageProbability)
+                    continue;
+
                 matchingMessages.AddRange(config.Messages);
+            }
         }
 
         if (matchingMessages.Count == 0)
@@ -339,6 +450,9 @@ public class MessageOnSkillUse : DailyModuleBase
 
         // 发送消息
         SendChatMessage(selectedMessage, ModuleConfig.ChatTypeConfig);
+
+        // 记录发送时间
+        lastMessageTime = now;
     }
 
     private static void PostUseActionLocationDelegate(
@@ -383,15 +497,15 @@ public class MessageOnSkillUse : DailyModuleBase
             var json = await HttpClientHelper.Get().GetStringAsync($"{Uri}/heal-action");
             var resp = JsonConvert.DeserializeObject<Dictionary<string, List<ActionInfo>>>(json);
             if (resp == null)
-                Error($"[HealerHelper] 远程治疗技能文件解析失败: {json}");
+                Error($"[MessageOnSkillUse] 远程治疗技能文件解析失败: {json}");
             else
-                TargetActions = resp.SelectMany(kv => kv.Value).ToDictionary(act => act.Id, act => act);
+                TargetActions = resp.SelectMany(kv => kv.Value).Where(p => p.On).ToDictionary(act => act.Id, act => act);
 
             ActionSelect ??= new ActionSelectCombo("##ActionSelect", LuminaGetter.Get<LuminaAction>().Where(x => TargetActions.ContainsKey(x.RowId)));
         }
         catch (Exception ex)
         {
-            Error($"[HealerHelper] 远程治疗技能文件获取失败: {ex}");
+            Error($"[HealerMessageOnSkillUse] 远程治疗技能文件获取失败: {ex}");
         }
     }
 
@@ -420,7 +534,9 @@ public class MessageOnSkillUse : DailyModuleBase
     /// <param name="chatType"></param>
     private static void SendChatMessage(string message, string chatType = ChatType.Echo)
     {
-        ChatHelper.SendMessage(chatType + message);
+        var lines = message.Split(['\n'], StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+            ChatHelper.SendMessage(chatType + line);
     }
 
     #region Config
@@ -439,9 +555,6 @@ public class MessageOnSkillUse : DailyModuleBase
         // 是否启用功能
         public bool IsEnabled { get; set; } = true;
 
-        // 消息发送概率（0-100）
-        public int MessageProbability { get; set; } = 100;
-
         /// <summary>
         /// 发送频道
         /// </summary>
@@ -457,6 +570,12 @@ public class MessageOnSkillUse : DailyModuleBase
     private class ConfigData
     {
         public bool IsEnabled { get; set; } = true;
+
+        /// <summary>
+        /// 消息发送概率（0-100）
+        /// </summary>
+        public int MessageProbability { get; set; } = 100;
+
         public List<uint> SelectedActionIDs { get; set; } = [];
         public List<string> Messages { get; set; } = [];
     }
@@ -473,5 +592,5 @@ public class ActionInfo
     public string Name { get; private set; }
 
     [JsonProperty("on")]
-    public bool On { get; private set; }
+    public bool On { get; private set; } = true;
 }
